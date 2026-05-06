@@ -1,0 +1,98 @@
+    {% extends "base.html" %}
+
+{% block page_title %}{{ get_text('track') }}{% endblock %}
+{% block breadcrumb %}Smart AI Grievance / Citizen Service / {{ get_text('track') }}{% endblock %}
+
+{% block content %}
+<section class="track-layout">
+    <article class="track-search-card">
+        <div class="track-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16.4 16.4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <h2>{{ get_text('track_your_complaint') }}</h2>
+        <p>Enter your unique ID to see real-time status.</p>
+
+        <form method="POST" action="{{ url_for('track_complaint') }}" class="track-form">
+            <input
+                id="complaint_uid"
+                name="complaint_uid"
+                type="text"
+                value="{{ searched_id }}"
+                placeholder="e.g. GRV-2024-001"
+                autocomplete="off"
+                required
+            />
+            <button type="submit" class="btn btn-primary">{{ get_text('search') }}</button>
+        </form>
+    </article>
+
+    {% if complaint %}
+        {% set timeline_index = ['Pending', 'In Progress', 'Resolved'].index(complaint['status']) if complaint['status'] in ['Pending', 'In Progress', 'Resolved'] else 0 %}
+        {% set status_class = complaint['status']|lower|replace(' ', '-') %}
+        {% set priority_class = complaint['priority']|lower %}
+        {% set category_icon = '🛣️' if complaint['category'] == 'Roads' else ('💧' if complaint['category'] == 'Water' else ('⚡' if complaint['category'] == 'Electricity' else ('🏥' if complaint['category'] == 'Healthcare' else ('🗑️' if complaint['category'] == 'Garbage' else '📌')))) %}
+
+        <article class="track-result-card reveal-in" id="trackResult">
+            <header class="result-head">
+                <div>
+                    <p class="result-id">{{ complaint['complaint_uid'] }}</p>
+                    <span class="result-date">{{ get_text('submitted_on') }} {{ complaint['created_at'] }}</span>
+                </div>
+                <div class="badge-row">
+                    <span class="badge priority {{ priority_class }}">{{ complaint['priority'] }}</span>
+                    <span class="badge status {{ status_class }}">{{ complaint['status'] }}</span>
+                </div>
+            </header>
+
+            <div class="result-copy-box">{{ complaint['text'] }}</div>
+
+            <div class="result-meta-grid">
+                <div class="meta-panel">
+                    <span>{{ get_text('category') }}</span>
+                    <strong>{{ category_icon }} {{ complaint['category'] }}</strong>
+                </div>
+                <div class="meta-panel">
+                    <span>{{ get_text('priority') }}</span>
+                    <strong>{{ complaint['priority'] }}</strong>
+                </div>
+                <div class="meta-panel">
+                    <span>{{ get_text('location') }}</span>
+                    <strong>{{ complaint['location'] }}</strong>
+                </div>
+                <div class="meta-panel">
+                    <span>{{ get_text('department') }}</span>
+                    <strong>{{ complaint['department_name'] or 'Unassigned' }}</strong>
+                </div>
+            </div>
+
+            <div class="status-timeline">
+                <div class="timeline-step {% if timeline_index > 0 %}done{% elif timeline_index == 0 %}active{% endif %}">
+                    <span class="dot"></span>
+                    <span>{{ get_text('submitted') }}</span>
+                </div>
+                <div class="connector {% if timeline_index > 0 %}done{% endif %}"></div>
+                <div class="timeline-step {% if timeline_index > 1 %}done{% elif timeline_index == 1 %}active{% endif %}">
+                    <span class="dot"></span>
+                    <span>{{ get_text('in_progress') }}</span>
+                </div>
+                <div class="connector {% if timeline_index > 1 %}done{% endif %}"></div>
+                <div class="timeline-step {% if timeline_index == 2 %}active{% endif %}">
+                    <span class="dot"></span>
+                    <span>{{ get_text('resolved') }}</span>
+                </div>
+            </div>
+        </article>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const input = document.getElementById("complaint_uid");
+        input?.addEventListener("input", () => {
+            input.value = input.value.toUpperCase();
+        });
+    })();
+</script>
+{% endblock %}

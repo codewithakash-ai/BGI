@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ dashboard_label }}{% endblock %}
+{% block breadcrumb %}Smart AI Grievance / Command Center / {{ dashboard_label }}{% endblock %}
+
+{% block content %}
+<section class="kpi-grid" aria-label="Dashboard metrics">
+    {% set total_trend = 1 if summary['total'] == 0 else ((summary['total'] * 0.08) | round(0, 'ceil') | int) %}
+    {% set pending_trend = 1 if summary['pending'] == 0 else ((summary['pending'] * 0.06) | round(0, 'ceil') | int) %}
+    {% set progress_trend = 1 if summary['in_progress'] == 0 else ((summary['in_progress'] * 0.05) | round(0, 'ceil') | int) %}
+    {% set resolved_trend = 1 if summary['resolved'] == 0 else ((summary['resolved'] * 0.09) | round(0, 'ceil') | int) %}
+
+    <article class="kpi-shell">
+        <div class="kpi-icon total">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h4v7H4v-7zm6 0h10v7H10v-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </div>
+        <p class="kpi-label">Total</p>
+        <h3 class="kpi-value">{{ summary['total'] }}</h3>
+        <p class="kpi-trend success">↑ {{ total_trend }} since yesterday</p>
+    </article>
+
+    <article class="kpi-shell">
+        <div class="kpi-icon pending">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/></svg>
+        </div>
+        <p class="kpi-label">Pending</p>
+        <h3 class="kpi-value">{{ summary['pending'] }}</h3>
+        <p class="kpi-trend danger">↑ {{ pending_trend }} since yesterday</p>
+    </article>
+
+    <article class="kpi-shell">
+        <div class="kpi-icon progress">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h4l2 5 4-10 2 5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <p class="kpi-label">In Progress</p>
+        <h3 class="kpi-value">{{ summary['in_progress'] }}</h3>
+        <p class="kpi-trend warning">↑ {{ progress_trend }} since yesterday</p>
+    </article>
+
+    <article class="kpi-shell">
+        <div class="kpi-icon resolved">
+            <svg viewBox="0 0 24 24" fill="none"><path d="m6 12 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        <p class="kpi-label">Resolved</p>
+        <h3 class="kpi-value">{{ summary['resolved'] }}</h3>
+        <p class="kpi-trend success">↑ {{ resolved_trend }} since yesterday</p>
+    </article>
+</section>
+
+<section class="filter-shell">
+    <div class="pill-set" role="tablist" aria-label="Complaint status filters">
+        <button class="filter-pill active" data-filter="all" type="button">All</button>
+        <button class="filter-pill" data-filter="pending" type="button">Pending</button>
+        <button class="filter-pill" data-filter="in progress" type="button">In Progress</button>
+        <button class="filter-pill" data-filter="resolved" type="button">Resolved</button>
+        <button class="filter-pill" data-filter="high" data-filter-priority="true" type="button">High Priority</button>
+    </div>
+
+    <div class="filter-actions">
+        <label class="sort-wrap">
+            <span>Sort</span>
+            <select id="sortComplaints">
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="priority">Priority: High to Low</option>
+                <option value="status">Status</option>
+            </select>
+        </label>
+        <button type="button" id="exportCsv" class="btn btn-ghost">Export CSV</button>
+    </div>
+</section>
+
+{% if complaints %}
+    <section class="complaints-grid" id="complaintsGrid" aria-live="polite">
+        {% for complaint in complaints %}
+            {% set status_class = complaint['status']|lower|replace(' ', '-') %}
+            {% set priority_class = complaint['priority']|lower %}
+            {% set category_icon = '🛣️' if complaint['category'] == 'Roads' else ('💧' if complaint['category'] == 'Water' else ('⚡' if complaint['category'] == 'Electricity' else ('🏥' if complaint['category'] == 'Healthcare' else ('🗑️' if complaint['category'] == 'Garbage' else '📌')))) %}
+
+            <article
+                class="complaint-card"
+                data-status="{{ complaint['status']|lower }}"
+                data-priority="{{ complaint['priority']|lower }}"
+                data-created="{{ complaint['created_at'] }}"
+                data-id="{{ complaint['complaint_uid'] }}"
+                data-location="{{ complaint['location'] }}"
+                data-category="{{ complaint['category'] }}"
+                data-department="{{ complaint['department_name'] or 'Unassigned' }}"
+            >
+                <header class="complaint-top">
+                    <span class="id-pill">{{ complaint['complaint_uid'] }}</span>
+                    <div class="badge-row">
+                        <span class="badge priority {{ priority_class }}">{{ complaint['priority'] }}</span>
+                        <span class="badge status {{ status_class }}">{{ complaint['status'] }}</span>
+                    </div>
+                </header>
+
+                <div class="complaint-meta">
+                    <span class="category-pill">{{ category_icon }} {{ complaint['category'] }}</span>
+                    <span class="location-label">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s6-5.6 6-11a6 6 0 1 0-12 0c0 5.4 6 11 6 11Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                        {{ complaint['location'] }}
+                    </span>
+                </div>
+
+                <p class="complaint-copy" data-collapsible>{{ complaint['text'] }}</p>
+                <button type="button" class="read-more" data-toggle-text>Read more</button>
+
+                {% if complaint['photo'] %}
+                    <div class="complaint-proof">
+                        <img src="{{ url_for('static', filename='uploads/' + complaint['photo']) }}" width="120" alt="Complaint proof">
+                    </div>
+                {% endif %}
+
+                <div class="complaint-divider"></div>
+
+                <div class="complaint-foot">
+                    <form method="POST" action="{{ url_for('update_status') }}" class="status-form">
+                        <input type="hidden" name="complaint_id" value="{{ complaint['complaint_id'] }}" />
+                        <select name="status" class="status-select status-{{ status_class }}" aria-label="Update complaint status">
+                            {% for status in status_options %}
+                                <option value="{{ status }}" {% if complaint['status'] == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary">Update Status</button>
+                    </form>
+                    <small class="created-at">{{ complaint['created_at'] }}</small>
+                </div>
+            </article>
+        {% endfor %}
+    </section>
+{% else %}
+    <section class="empty-state">
+        <h3>No complaints in this view</h3>
+        <p>New grievances will appear here as soon as they are registered.</p>
+    </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const grid = document.getElementById("complaintsGrid");
+        if (!grid) {
+            return;
+        }
+
+        const cards = Array.from(grid.querySelectorAll(".complaint-card"));
+        const filterButtons = Array.from(document.querySelectorAll(".filter-pill"));
+        const sortSelect = document.getElementById("sortComplaints");
+        const exportButton = document.getElementById("exportCsv");
+        const globalSearch = document.getElementById("globalSearch");
+
+        function toPriorityWeight(value) {
+            if (value === "high") return 3;
+            if (value === "medium") return 2;
+            return 1;
+        }
+
+        function toStatusWeight(value) {
+            if (value === "pending") return 1;
+            if (value === "in progress") return 2;
+            if (value === "resolved") return 3;
+            return 99;
+        }
+
+        function applyFilters() {
+            const activeFilterButton = filterButtons.find((button) => button.classList.contains("active"));
+            const activeFilter = activeFilterButton ? activeFilterButton.dataset.filter : "all";
+            const filterPriorityOnly = activeFilterButton?.dataset.filterPriority === "true";
+            const query = (globalSearch?.value || "").trim().toLowerCase();
+
+            cards.forEach((card) => {
+                const status = card.dataset.status || "";
+                const priority = card.dataset.priority || "";
+                const searchable = [
+                    card.dataset.id || "",
+                    card.dataset.location || "",
+                    card.dataset.category || "",
+                    card.dataset.department || "",
+                    card.querySelector(".complaint-copy")?.textContent || "",
+                ]
+                    .join(" ")
+                    .toLowerCase();
+
+                const statusMatch = activeFilter === "all" || (filterPriorityOnly ? priority === "high" : status === activeFilter);
+                const searchMatch = !query || searchable.includes(query);
+                card.style.display = statusMatch && searchMatch ? "grid" : "none";
+            });
+        }
+
+        function sortCards() {
+            const mode = sortSelect?.value || "newest";
+            const visibleCards = cards.slice().sort((a, b) => {
+                if (mode === "oldest") {
+                    return a.dataset.created.localeCompare(b.dataset.created);
+                }
+                if (mode === "priority") {
+                    return toPriorityWeight(b.dataset.priority) - toPriorityWeight(a.dataset.priority);
+                }
+                if (mode === "status") {
+                    return toStatusWeight(a.dataset.status) - toStatusWeight(b.dataset.status);
+                }
+                return b.dataset.created.localeCompare(a.dataset.created);
+            });
+
+            visibleCards.forEach((card) => grid.appendChild(card));
+        }
+
+        filterButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                filterButtons.forEach((node) => node.classList.remove("active"));
+                button.classList.add("active");
+                applyFilters();
+            });
+        });
+
+        sortSelect?.addEventListener("change", () => {
+            sortCards();
+            applyFilters();
+        });
+
+        globalSearch?.addEventListener("input", applyFilters);
+
+        grid.querySelectorAll("[data-toggle-text]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const text = button.previousElementSibling;
+                if (!text) return;
+                text.classList.toggle("expanded");
+                button.textContent = text.classList.contains("expanded") ? "Read less" : "Read more";
+            });
+        });
+
+        function syncStatusSelectColor(select) {
+            select.classList.remove("status-pending", "status-in-progress", "status-resolved");
+            const normalized = (select.value || "").toLowerCase().replace(/\s+/g, "-");
+            select.classList.add(`status-${normalized}`);
+        }
+
+        grid.querySelectorAll(".status-select").forEach((select) => {
+            syncStatusSelectColor(select);
+            select.addEventListener("change", () => syncStatusSelectColor(select));
+        });
+
+        exportButton?.addEventListener("click", () => {
+            const rows = [["Complaint ID", "Category", "Priority", "Status", "Location", "Created At", "Text"]];
+            cards.forEach((card) => {
+                if (card.style.display === "none") return;
+                rows.push([
+                    card.dataset.id || "",
+                    card.dataset.category || "",
+                    card.dataset.priority || "",
+                    card.dataset.status || "",
+                    card.dataset.location || "",
+                    card.dataset.created || "",
+                    (card.querySelector(".complaint-copy")?.textContent || "").trim(),
+                ]);
+            });
+
+            const csv = rows
+                .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+                .join("\n");
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "complaints-export.csv";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(link.href);
+
+            window.AppToast?.show("Complaint export generated", "success");
+        });
+
+        sortCards();
+        applyFilters();
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ get_text('register_complaint') }}{% endblock %}
+{% block breadcrumb %}Smart AI Grievance / Citizen Service / {{ get_text('register_complaint') }}{% endblock %}
+
+{% block content %}
+<section class="form-shell wide">
+    <div class="section-copy">
+        <h2>{{ get_text('register_complaint') }}</h2>
+        <p>Submit your grievance and our AI engine will classify, prioritize, and route it instantly to the right department.</p>
+    </div>
+
+    <form method="POST" action="{{ url_for('submit_complaint') }}" class="form-grid" enctype="multipart/form-data">
+        <label class="field-group">
+            <span>{{ get_text('username') }}</span>
+            <input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Your full name"
+                value="{{ session.get('username', '') }}"
+                readonly
+                required
+            />
+        </label>
+
+        <label class="field-group">
+            <span>{{ get_text('location') }}</span>
+            <input id="location" name="location" type="text" placeholder="Area / Ward / City" required />
+        </label>
+
+        <label class="field-group">
+            <span>{{ get_text('language') }}</span>
+            <select id="language" name="language" class="form-control">
+                <option value="en-IN">English</option>
+                <option value="hi-IN">Hindi</option>
+            </select>
+        </label>
+
+        <label class="field-group field-full">
+            <span>{{ get_text('complaint_text') }}</span>
+            <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                <textarea
+                    id="complaint_text"
+                    name="complaint_text"
+                    rows="6"
+                    placeholder="Describe your issue in detail..."
+                    required
+                ></textarea>
+                <div style="min-width:220px;">
+                    <label style="display:block; font-weight:600; margin-bottom:8px;">Upload Proof (Image)</label>
+                    <input type="file" name="photo" accept="image/*">
+                </div>
+            </div>
+        </label>
+
+        <div class="field-full action-row">
+            <button type="submit" class="btn btn-primary">{{ get_text('submit') }}</button>
+            <button type="button" id="voice-btn" class="btn btn-ghost">🎤 Speak</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const voiceButton = document.getElementById("voice-btn");
+        const complaintBox = document.getElementById("complaint_text");
+        const languageSelect = document.getElementById("language");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let isListening = false;
+
+        if (!voiceButton || !complaintBox) {
+            return;
+        }
+
+        if (!SpeechRecognition) {
+            voiceButton.disabled = true;
+            voiceButton.textContent = "Voice Input Not Supported";
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        function toggleListen() {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.lang = languageSelect.value;
+                recognition.start();
+            }
+        }
+
+        voiceButton.addEventListener("click", toggleListen);
+
+        recognition.addEventListener("start", () => {
+            isListening = true;
+            voiceButton.textContent = "🛑 Stop";
+        });
+
+        recognition.addEventListener("end", () => {
+            isListening = false;
+            voiceButton.textContent = "🎤 Speak";
+        });
+
+        recognition.addEventListener("result", (event) => {
+            const transcript = event.results[0][0].transcript;
+            complaintBox.value = complaintBox.value
+                ? `${complaintBox.value} ${transcript}`
+                : transcript;
+        });
+
+        recognition.addEventListener("error", (event) => {
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                alert("Microphone access required for voice input.");
+            }
+            console.error("Speech recognition error", event.error);
+        });
+    })();
+</script>
+{% endblock %}

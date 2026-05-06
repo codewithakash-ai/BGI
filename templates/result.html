@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block page_title %}Complaint Submitted{% endblock %}
+{% block breadcrumb %}Smart AI Grievance / Citizen Service / Submission Status{% endblock %}
+
+{% block content %}
+<section class="form-shell wide">
+    <div class="section-copy">
+        <h2>Submission Successful</h2>
+        <p class="success-line">{{ message }}</p>
+    </div>
+
+    {% set category_icon = '🛣️' if category == 'Roads' else ('💧' if category == 'Water' else ('⚡' if category == 'Electricity' else ('🏥' if category == 'Healthcare' else ('🗑️' if category == 'Garbage' else '📌')))) %}
+
+    <div class="result-meta-grid">
+        <div class="meta-panel">
+            <span>Complaint ID</span>
+            <strong class="mono-pill">{{ complaint_uid }}</strong>
+        </div>
+        <div class="meta-panel">
+            <span>Priority</span>
+            <strong>{{ priority }}</strong>
+        </div>
+        <div class="meta-panel">
+            <span>Category</span>
+            <strong>{{ category_icon }} {{ category }}</strong>
+        </div>
+        <div class="meta-panel">
+            <span>Assigned Department</span>
+            <strong>{{ department }}</strong>
+        </div>
+        <div class="meta-panel field-full">
+            <span>Location</span>
+            <strong>{{ location }}</strong>
+        </div>
+    </div>
+
+    <div class="status-timeline result-timeline">
+        <div class="timeline-step active">
+            <span class="dot"></span>
+            <span>Submitted</span>
+        </div>
+        <div class="connector"></div>
+        <div class="timeline-step">
+            <span class="dot"></span>
+            <span>In Progress</span>
+        </div>
+        <div class="connector"></div>
+        <div class="timeline-step">
+            <span class="dot"></span>
+            <span>Resolved</span>
+        </div>
+    </div>
+
+    <div class="action-row">
+        <a class="btn btn-primary" href="{{ url_for('track_complaint') }}">Track Complaint</a>
+        <a class="btn btn-ghost" href="{{ url_for('index') }}">Submit Another</a>
+    </div>
+</section>
+{% endblock %}

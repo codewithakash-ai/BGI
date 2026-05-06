@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+
+# Runtime artifacts
+database/grievance_system.db
+models/complaint_classifier.pkl
+models/tfidf_vectorizer.pkl

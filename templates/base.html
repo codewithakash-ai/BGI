@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ title or "Smart AI Grievance Management System" }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    {% set endpoint = request.endpoint or '' %}
+    {% set is_dashboard_page = endpoint in ['admin_dashboard', 'dashboard'] %}
+    {% set is_track_page = endpoint == 'track_complaint' %}
+    {% set is_analytics_page = endpoint == 'analytics_dashboard' %}
+
+    <div class="app-shell" id="appShell">
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">AI</div>
+                <div class="brand-copy">
+                    <p class="brand-title">Smart AI Grievance</p>
+                    <p class="brand-subtitle">Management System</p>
+                </div>
+            </div>
+
+            <div class="sidebar-scroll">
+                <section class="nav-group">
+                    <p class="group-title">{{ get_text('main') }}</p>
+                    <a href="{{ sidebar_dashboard_url }}" class="nav-item {% if is_dashboard_page %}active{% endif %}">
+                        <span class="active-bar"></span>
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h4v7H4v-7zm6 0h10v7H10v-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                        </span>
+                        <span class="nav-text">{{ get_text('dashboard') }}</span>
+                    </a>
+                    <a href="{{ url_for('track_complaint') }}" class="nav-item {% if is_track_page %}active{% endif %}">
+                        <span class="active-bar"></span>
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        </span>
+                        <span class="nav-text">{{ get_text('track') }}</span>
+                        <span class="nav-badge">{{ "99+" if sidebar_pending_count > 99 else sidebar_pending_count }}</span>
+                    </a>
+                    <a href="{{ url_for('analytics_dashboard') }}" class="nav-item {% if is_analytics_page %}active{% endif %}">
+                        <span class="active-bar"></span>
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M5 19V9m7 10V5m7 14v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.5 19.5h17" stroke="currentColor" stroke-width="1.6"/></svg>
+                        </span>
+                        <span class="nav-text">{{ get_text('analytics') }}</span>
+                    </a>
+                    
+                </section>
+
+                
+
+                
+            </div>
+
+            <div class="sidebar-footer">
+                <p class="group-title footer-title">{{ get_text('account') }}</p>
+                <div class="profile-chip">
+                    <div class="avatar-core">{{ shell_user_initials }}</div>
+                    <div class="profile-copy">
+                        <p>{{ shell_user_name }}</p>
+                        <span>{{ shell_user_role }}</span>
+                    </div>
+                </div>
+                <a href="{{ shell_logout_url }}" class="logout-link">
+                    <span class="logout-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="1.6"/><path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.5 12H9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                    </span>
+                    <span>{{ get_text('logout') if shell_logout_label == 'Logout' else get_text('login') }}</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="app-main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button type="button" class="menu-toggle" id="menuToggle" aria-label="Open navigation">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </button>
+                    <div>
+                        <h1 class="page-title">{% block page_title %}{{ title or get_text('dashboard') }}{% endblock %}</h1>
+                        <p class="page-breadcrumb">{% block breadcrumb %}Smart AI Grievance / {{ title or get_text('dashboard') }}{% endblock %}</p>
+                    </div>
+                </div>
+
+                <div class="topbar-center">
+                    <label class="search-shell" for="globalSearch">
+                        <span class="search-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                        </span>
+                        <input id="globalSearch" type="search" placeholder="{{ get_text('search_placeholder') }}" autocomplete="off" />
+                        <span class="shortcut-chip">⌘K</span>
+                    </label>
+                </div>
+
+                <div class="topbar-right">
+                    <details class="lang-menu">
+                        <summary>
+                            <span class="lang-icon">🌐</span>
+                            <span class="lang-copy">{{ 'हिंदी' if current_lang == 'hi' else 'English' }}</span>
+                            <span class="menu-chevron">▾</span>
+                        </summary>
+                        <div class="menu-panel">
+                            <a href="{{ url_for('set_language', lang='en') }}" class="{% if current_lang == 'en' %}active{% endif %}">English</a>
+                            <a href="{{ url_for('set_language', lang='hi') }}" class="{% if current_lang == 'hi' %}active{% endif %}">हिंदी</a>
+                        </div>
+                    </details>
+                    <label class="department-select">
+                        <span>
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 20h16M6 20V8l6-3 6 3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </span>
+                        <select id="departmentSelect">
+                            {% if is_admin_user %}
+                                <option value="">All Departments</option>
+                                <option value="Water">Water Department</option>
+                                <option value="Electricity">Electricity Department</option>
+                                <option value="Roads">Roads Department</option>
+                                <option value="Healthcare">Healthcare Department</option>
+                                <option value="Garbage">Sanitation Department</option>
+                            {% elif active_department_slug %}
+                                <option value="{{ active_department_name }}">{{ active_department_name }}</option>
+                            {% else %}
+                                <option value="Citizen Portal">{{ get_text('citizen_access') }}</option>
+                            {% endif %}
+                        </select>
+                    </label>
+
+                    <details class="profile-menu">
+                        <summary>
+                            <span class="menu-avatar">{{ shell_user_initials }}</span>
+                            <span class="menu-copy">
+                                <strong>{{ shell_user_name }}</strong>
+                                <small>{{ active_department_name }}</small>
+                            </span>
+                            <span class="menu-chevron">▾</span>
+                        </summary>
+                        <div class="menu-panel">
+                            <p>{{ shell_user_role }}</p>
+                            <a href="{{ shell_logout_url }}">{{ get_text('logout') if shell_logout_label == 'Logout' else get_text('login') }}</a>
+                        </div>
+                    </details>
+                </div>
+            </header>
+
+            <div class="content-scroll">
+                <main class="page-stage" id="pageStage">
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <nav class="mobile-nav">
+        <a href="{{ sidebar_dashboard_url }}" class="mobile-item {% if is_dashboard_page %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zM4 13h4v7H4v-7zm6 0h10v7H10v-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <span>{{ get_text('dashboard') }}</span>
+        </a>
+        <a href="{{ url_for('track_complaint') }}" class="mobile-item {% if is_track_page %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>{{ get_text('track') }}</span>
+        </a>
+        <a href="{{ url_for('analytics_dashboard') }}" class="mobile-item {% if is_analytics_page %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 19V9m7 10V5m7 14v-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.5 19.5h17" stroke="currentColor" stroke-width="1.6"/></svg>
+            <span>{{ get_text('analytics') }}</span>
+        </a>
+        <a href="{{ shell_logout_url }}" class="mobile-item">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="1.6"/><path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.5 12H9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>{{ get_text('logout') if shell_logout_label == 'Logout' else get_text('login') }}</span>
+        </a>
+    </nav>
+
+    <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <script>
+        window.__FLASHES__ = {{ get_flashed_messages(with_categories=true) | tojson }};
+    </script>
+    <script>
+        (function () {
+            const body = document.body;
+            const sidebar = document.getElementById("appSidebar");
+            const toggle = document.getElementById("menuToggle");
+            const stage = document.getElementById("pageStage");
+            const toastStack = document.getElementById("toastStack");
+            const searchInput = document.getElementById("globalSearch");
+            const departmentSelect = document.getElementById("departmentSelect");
+
+            if (stage) {
+                requestAnimationFrame(() => stage.classList.add("visible"));
+            }
+
+
+            if (toggle) {
+                toggle.addEventListener("click", () => {
+                    body.classList.toggle("sidebar-open");
+                    sidebar?.classList.toggle("open");
+                });
+            }
+
+            document.addEventListener("click", (event) => {
+                if (!body.classList.contains("sidebar-open")) {
+                    return;
+                }
+                if (!sidebar || sidebar.contains(event.target) || toggle?.contains(event.target)) {
+                    return;
+                }
+                body.classList.remove("sidebar-open");
+                sidebar.classList.remove("open");
+            });
+
+            document.addEventListener("keydown", (event) => {
+                const isMac = navigator.platform.toUpperCase().includes("MAC");
+                const modifier = isMac ? event.metaKey : event.ctrlKey;
+                if (modifier && event.key.toLowerCase() === "k") {
+                    event.preventDefault();
+                    searchInput?.focus();
+                }
+            });
+
+            departmentSelect?.addEventListener("change", () => {
+                const selected = departmentSelect.value;
+                const url = selected ? `/admin?category=${encodeURIComponent(selected)}` : "/admin";
+                window.location.href = url;
+            });
+
+
+            function toastTone(message, category) {
+                const msg = String(message || "").toLowerCase();
+                if (msg.includes("not found")) {
+                    return { icon: "❌", type: "error" };
+                }
+                if (msg.includes("found")) {
+                    return { icon: "🔍", type: "info" };
+                }
+                if (msg.includes("status updated")) {
+                    return { icon: "✅", type: "success" };
+                }
+                if (msg.includes("registered")) {
+                    return { icon: "📋", type: "success" };
+                }
+                if (category === "success") {
+                    return { icon: "✅", type: "success" };
+                }
+                return { icon: "ℹ️", type: "info" };
+            }
+
+            function showToast(message, category) {
+                if (!toastStack || !message) {
+                    return;
+                }
+                const tone = toastTone(message, category);
+                const toast = document.createElement("div");
+                toast.className = `toast-item ${tone.type}`;
+                toast.innerHTML = `<span class="toast-icon">${tone.icon}</span><span>${message}</span>`;
+                toastStack.appendChild(toast);
+
+                window.setTimeout(() => {
+                    toast.classList.add("toast-out");
+                    window.setTimeout(() => toast.remove(), 320);
+                }, 3000);
+            }
+
+            window.AppToast = { show: showToast };
+
+            const flashes = Array.isArray(window.__FLASHES__) ? window.__FLASHES__ : [];
+            flashes.forEach((flash) => {
+                const category = flash?.[0] || "info";
+                const message = flash?.[1] || "";
+                showToast(message, category);
+            });
+
+            document.querySelectorAll("[data-toast]").forEach((el) => {
+                el.addEventListener("click", () => showToast(el.getAttribute("data-toast"), "info"));
+            });
+
+        })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
