@@ -327,7 +327,7 @@ def send_otp(email: str, otp: str) -> bool:
             "content-type": "application/json",
         }
         data = {
-            "sender": {"email": BREVO_SENDER_EMAIL},
+            "sender": {"email": "aigrievancecitizensystem@gmail.com"},
             "to": [{"email": email}],
             "subject": "OTP Verification",
             "htmlContent": f"<h3>Your OTP is {otp}</h3>",
@@ -335,7 +335,12 @@ def send_otp(email: str, otp: str) -> bool:
 
         response = requests.post(url, json=data, headers=headers, timeout=15)
         print("BREVO RESPONSE:", response.text)
-        return response.status_code == 201
+        if response.status_code == 201:
+            print("EMAIL SENT SUCCESS ✅")
+            return True
+        else:
+            print("BREVO FAILED:", response.text)
+            return False
     except Exception as e:
         print("BREVO ERROR:", e)
         return False
