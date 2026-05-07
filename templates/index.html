@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
 {% block page_title %}{{ get_text('register_complaint') }}{% endblock %}
-{% block breadcrumb %}Smart AI Grievance / Citizen Service / {{ get_text('register_complaint') }}{% endblock %}
+{% block breadcrumb %}Smart Grievance / Citizen Service / {{ get_text('register_complaint') }}{% endblock %}
 
 {% block content %}
 <section class="form-shell wide">
     <div class="section-copy">
         <h2>{{ get_text('register_complaint') }}</h2>
-        <p>Submit your grievance and our AI engine will classify, prioritize, and route it instantly to the right department.</p>
+        <p>Submit your grievance and the system will prioritize and route it to the right department.</p>
     </div>
 
     <form method="POST" action="{{ url_for('submit_complaint') }}" class="form-grid" enctype="multipart/form-data">
@@ -29,34 +29,30 @@
             <input id="location" name="location" type="text" placeholder="Area / Ward / City" required />
         </label>
 
-        <label class="field-group">
-            <span>{{ get_text('language') }}</span>
-            <select id="language" name="language" class="form-control">
-                <option value="en-IN">English</option>
-                <option value="hi-IN">Hindi</option>
-            </select>
-        </label>
-
-        <label class="field-group field-full">
-            <span>{{ get_text('complaint_text') }}</span>
-            <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+        <div class="field-group field-full complaint-upload">
+            <div class="complaint-input">
+                <span>{{ get_text('complaint_text') }}</span>
                 <textarea
                     id="complaint_text"
                     name="complaint_text"
                     rows="6"
-                    placeholder="Describe your issue in detail..."
+                    placeholder="Describe your issue clearly..."
                     required
                 ></textarea>
-                <div style="min-width:220px;">
-                    <label style="display:block; font-weight:600; margin-bottom:8px;">Upload Proof (Image)</label>
-                    <input type="file" name="photo" accept="image/*">
-                </div>
             </div>
-        </label>
+            <div class="upload-card">
+                <span><strong>Upload Proof (Optional)</strong></span>
+                <div class="upload-control">
+                    <input id="photos" class="file-input" type="file" name="photos" accept="image/*" multiple>
+                    <label class="file-trigger" for="photos">Choose images</label>
+                    <span class="file-count" id="photoCount">0 images selected</span>
+                </div>
+                <small class="upload-hint">Upload up to 2 images (JPG, PNG)</small>
+            </div>
+        </div>
 
         <div class="field-full action-row">
             <button type="submit" class="btn btn-primary">{{ get_text('submit') }}</button>
-            <button type="button" id="voice-btn" class="btn btn-ghost">🎤 Speak</button>
         </div>
     </form>
 </section>
@@ -65,59 +61,47 @@
 {% block scripts %}
 <script>
     (function () {
-        const voiceButton = document.getElementById("voice-btn");
-        const complaintBox = document.getElementById("complaint_text");
-        const languageSelect = document.getElementById("language");
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let isListening = false;
-
-        if (!voiceButton || !complaintBox) {
+        const form = document.querySelector("form");
+        if (!form) {
             return;
         }
+        const input = form.querySelector("input[name='photos']");
+        const countLabel = document.getElementById("photoCount");
+        const dataTransfer = new DataTransfer();
 
-        if (!SpeechRecognition) {
-            voiceButton.disabled = true;
-            voiceButton.textContent = "Voice Input Not Supported";
-            return;
+        if (input && countLabel) {
+            input.addEventListener("change", () => {
+                const selected = Array.from(input.files || []);
+                if (!selected.length) {
+                    return;
+                }
+
+                selected.forEach((file) => {
+                    if (dataTransfer.files.length < 2) {
+                        dataTransfer.items.add(file);
+                    }
+                });
+
+                if (dataTransfer.files.length > 2) {
+                    alert("You can upload maximum 2 images only");
+                    dataTransfer.items.clear();
+                }
+
+                input.files = dataTransfer.files;
+                const count = dataTransfer.files.length;
+                countLabel.textContent = `${count} image${count === 1 ? "" : "s"} selected`;
+            });
         }
 
-        const recognition = new SpeechRecognition();
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        function toggleListen() {
-            if (isListening) {
-                recognition.stop();
-            } else {
-                recognition.lang = languageSelect.value;
-                recognition.start();
+        form.addEventListener("submit", (event) => {
+            if (!input) {
+                return;
             }
-        }
-
-        voiceButton.addEventListener("click", toggleListen);
-
-        recognition.addEventListener("start", () => {
-            isListening = true;
-            voiceButton.textContent = "🛑 Stop";
-        });
-
-        recognition.addEventListener("end", () => {
-            isListening = false;
-            voiceButton.textContent = "🎤 Speak";
-        });
-
-        recognition.addEventListener("result", (event) => {
-            const transcript = event.results[0][0].transcript;
-            complaintBox.value = complaintBox.value
-                ? `${complaintBox.value} ${transcript}`
-                : transcript;
-        });
-
-        recognition.addEventListener("error", (event) => {
-            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                alert("Microphone access required for voice input.");
+            const files = input.files || [];
+            if (files.length > 2) {
+                alert("You can upload maximum 2 images only");
+                event.preventDefault();
             }
-            console.error("Speech recognition error", event.error);
         });
     })();
 </script>

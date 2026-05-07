@@ -2,9 +2,9 @@
 Citizen Grievance web app (Flask).
 
 How this file is organized (good reading order for beginners):
-  1. Imports — bring in Flask tools and our database / ML helpers.
+  1. Imports — bring in Flask tools and our database helpers.
   2. Settings — demo passwords, department lists, keyword sets.
-  3. bootstrap_app() — runs once at import: create DB tables and train/load the ML model.
+  3. bootstrap_app() — runs once at import: create DB tables.
   4. Small helper functions — reused checks (who is logged in?, normalize URLs, etc.).
   5. inject_layout_context — fills sidebar / top bar on every HTML page.
   6. Route functions — each @app.route("/some-path") handles one URL.
@@ -24,10 +24,10 @@ from email.mime.text import MIMEText
 from typing import Dict, Optional, Tuple
 from uuid import uuid4
 
+import joblib
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
 
 from database.db import (
     CATEGORY_TO_DEPARTMENT,
@@ -45,7 +45,6 @@ from database.db import (
     set_complaint_status_by_id,
     update_user_otp,
 )
-from models.ml_model import classify_complaint, train_model
 
 # =============================================================================
 # SETTINGS (demo values — replace for a real deployment)
@@ -62,7 +61,40 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 3 * 1024 * 1024
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+MODEL_PATH = os.path.join(BASE_DIR, "model.pkl")
+VECTORIZER_PATH = os.path.join(BASE_DIR, "vectorizer.pkl")
+
+if not os.path.exists(MODEL_PATH):
+    raise FileNotFoundError(f"Missing pre-trained model file: {MODEL_PATH}")
+if not os.path.exists(VECTORIZER_PATH):
+    raise FileNotFoundError(f"Missing pre-trained vectorizer file: {VECTORIZER_PATH}")
+
+# Load pre-trained ML artifacts once at startup (no runtime training).
+model = joblib.load(MODEL_PATH)
+vectorizer = joblib.load(VECTORIZER_PATH)
+
+
+def load_env_file(path: str) -> None:
+    """Load simple KEY=VALUE pairs from a local .env file without extra deps."""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("\"").strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError:
+        # OTP email can still work if vars are provided by the host environment.
+        pass
+
+
+load_env_file(os.path.join(BASE_DIR, ".env"))
 
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -94,6 +126,16 @@ DEPARTMENT_TO_CATEGORY = {
 
 HIGH_PRIORITY_KEYWORDS = {"urgent", "emergency", "danger"}
 MEDIUM_PRIORITY_KEYWORDS = {"soon", "delay"}
+MODEL_LABEL_TO_CATEGORY = {
+    "road": "Roads",
+    "roads": "Roads",
+    "water": "Water",
+    "electricity": "Electricity",
+    "garbage": "Garbage",
+    "health": "Healthcare",
+    "healthcare": "Healthcare",
+    "fire": "Fire",
+}
 
 TRANSLATIONS = {
     "en": {
@@ -136,7 +178,6 @@ TRANSLATIONS = {
         "track_your_complaint": "Track Your Complaint",
         "username": "Username",
         "username_or_email": "Username or Email",
-        "use_voice_input": "Use Voice Input",
         "verify": "Verify",
         "verify_email": "Verify Email",
         "otp_code": "OTP Code",
@@ -183,7 +224,6 @@ TRANSLATIONS = {
         "track_your_complaint": "अपनी शिकायत ट्रैक करें",
         "username": "यूजरनेम",
         "username_or_email": "यूजरनेम या ईमेल",
-        "use_voice_input": "वॉयस इनपुट का उपयोग करें",
         "verify": "सत्यापित करें",
         "verify_email": "ईमेल सत्यापन",
         "otp_code": "ओटीपी कोड",
@@ -200,9 +240,8 @@ def get_text(key: str) -> str:
 
 
 def bootstrap_app() -> None:
-    """Prepare SQLite schema and ML artifacts before any HTTP requests."""
+    """Prepare SQLite schema before any HTTP requests."""
     init_db()
-    train_model()
 
 
 bootstrap_app()
@@ -257,6 +296,14 @@ def priority_from_text(complaint_text: str) -> str:
     return "Low"
 
 
+def classify_complaint(text: str) -> str:
+    """Classify grievance text using pre-trained model + vectorizer."""
+    X = vectorizer.transform([text])
+    prediction = model.predict(X)[0]
+    prediction_label = str(prediction).strip().lower()
+    return MODEL_LABEL_TO_CATEGORY.get(prediction_label, "Roads")
+
+
 def allowed_file(filename: str) -> bool:
     """Allow only specific image file extensions."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -275,8 +322,8 @@ def dashboard_summary_counts(complaints) -> Dict[str, int]:
 
 def send_otp_email(recipient: str, otp_code: str) -> bool:
     """Send OTP email using SMTP settings from environment variables."""
+    server = None
     try:
-        print("SMTP USER:", SMTP_USERNAME)
         if SMTP_USERNAME is None or not str(SMTP_USERNAME).strip():
             raise RuntimeError("SMTP not loaded")
         if SMTP_PASSWORD is None or not str(SMTP_PASSWORD).strip():
@@ -285,26 +332,30 @@ def send_otp_email(recipient: str, otp_code: str) -> bool:
         if sender is None or not str(sender).strip():
             raise RuntimeError("SMTP sender not loaded")
 
-        print("Sending OTP to:", recipient)
-        print("OTP:", otp_code)
-
         message = MIMEText("Your OTP is: {code}".format(code=otp_code))
         message["Subject"] = "OTP Verification"
         message["From"] = sender
         message["To"] = recipient
 
         if SMTP_USE_SSL:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+            server.ehlo()
             if SMTP_USE_TLS:
                 server.starttls()
+                server.ehlo()
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(message)
         server.quit()
         return True
     except Exception as exc:
         print("SMTP ERROR:", exc)
+        if server is not None:
+            try:
+                server.quit()
+            except Exception:
+                pass
         return False
 
 
@@ -500,18 +551,31 @@ def register():
             existing_user = get_user_by_login(conflict_identifier)
 
             if existing_user and not int(existing_user["is_verified"] or 0):
-                otp_code = str(random.randint(100000, 999999))
-                otp_expiry = (datetime.now() + timedelta(minutes=5)).isoformat()
-                update_user_otp(int(existing_user["id"]), otp_code, otp_expiry)
                 session["pending_user_id"] = int(existing_user["id"])
                 existing_email = str(existing_user["email"] or email)
-                if send_otp_email(existing_email, otp_code):
-                    flash("Account exists but is not verified. OTP resent.", "success")
+                otp_code_existing = str(existing_user["otp_code"] or "").strip()
+                otp_expiry_raw = str(existing_user["otp_expiry"] or "").strip()
+                otp_still_valid = False
+                if otp_code_existing and otp_expiry_raw:
+                    try:
+                        otp_expiry_existing = datetime.fromisoformat(otp_expiry_raw)
+                        otp_still_valid = datetime.now() <= otp_expiry_existing
+                    except ValueError:
+                        otp_still_valid = False
+
+                if otp_still_valid:
+                    flash("OTP already sent. Please check your email or resend.", "success")
                 else:
-                    flash(
-                        "Failed to send OTP. Please check email configuration.",
-                        "danger",
-                    )
+                    otp_code = str(random.randint(100000, 999999))
+                    otp_expiry = (datetime.now() + timedelta(minutes=5)).isoformat()
+                    update_user_otp(int(existing_user["id"]), otp_code, otp_expiry)
+                    if send_otp_email(existing_email, otp_code):
+                        flash("Account exists but is not verified. OTP resent.", "success")
+                    else:
+                        flash(
+                            "Failed to send OTP. Please check email configuration.",
+                            "danger",
+                        )
                 return redirect(url_for("verify_email"))
 
             session.pop("pending_user_id", None)
@@ -666,7 +730,7 @@ def verify_email():
 def resend_otp():
     pending_id = session.get("pending_user_id")
     if not pending_id:
-        flash("Please login or register to verify your em3ail.")
+        flash("Please login or register to verify your email.")
         return redirect(url_for("user_login"))
 
     user = get_user_by_id(int(pending_id))
@@ -706,8 +770,11 @@ def submit_complaint():
     location = request.form.get("location", "").strip()
     complaint_text = request.form.get("complaint_text", "").strip()
 
-    if not name or not location or not complaint_text:
-        flash("Please fill out Name, Location, and Complaint Text.")
+    if not complaint_text:
+        flash("Please enter complaint.")
+        return redirect(url_for("index"))
+    if not name or not location:
+        flash("Please fill out Name and Location.")
         return redirect(url_for("index"))
 
     user = get_user_by_id(int(session["user_id"]))
@@ -722,16 +789,26 @@ def submit_complaint():
         flash("Please verify your email to submit a complaint.")
         return redirect(url_for("verify_email"))
 
-    file = request.files.get("photo")
-    filename = None
-    if file and file.filename:
-        if not allowed_file(file.filename):
+    uploads = request.files.getlist("photos")
+    files = [item for item in uploads if item and item.filename]
+    if len(files) > 2:
+        flash("You can upload maximum 2 images only")
+        return redirect(url_for("index"))
+
+    for item in files:
+        if not allowed_file(item.filename):
             flash("Only JPG and PNG images are allowed.")
             return redirect(url_for("index"))
-        extension = file.filename.rsplit(".", 1)[1].lower()
+
+    saved_files = []
+    for item in files:
+        extension = item.filename.rsplit(".", 1)[1].lower()
         filename = secure_filename(f"{uuid4().hex}.{extension}")
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(file_path)
+        item.save(file_path)
+        saved_files.append(filename)
+
+    filename = ",".join(saved_files) if saved_files else None
 
     user_id = int(user["id"])
     category = classify_complaint(complaint_text)
@@ -923,4 +1000,3 @@ def analytics_dashboard():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, ssl_context=("cert.pem", "key.pem"))
-

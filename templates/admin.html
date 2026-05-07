@@ -107,8 +107,13 @@
                 <button type="button" class="read-more" data-toggle-text>Read more</button>
 
                 {% if complaint['photo'] %}
+                    {% set photos = complaint['photo'].split(',') %}
                     <div class="complaint-proof">
-                        <img src="{{ url_for('static', filename='uploads/' + complaint['photo']) }}" width="120" alt="Complaint proof">
+                        {% for photo in photos %}
+                            {% if photo %}
+                                <img src="{{ url_for('static', filename='uploads/' + photo) }}" width="120" alt="Complaint proof">
+                            {% endif %}
+                        {% endfor %}
                     </div>
                 {% endif %}
 

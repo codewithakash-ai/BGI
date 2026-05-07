@@ -1,6 +1,6 @@
-# AI-Based Citizen Grievance Classification System
+# Citizen Grievance Management System
 
-Complete local project using **Python + Flask + SQLite + scikit-learn**.
+Complete local project using **Python + Flask + SQLite**.
 
 ## Folder Structure
 
@@ -13,11 +13,6 @@ bgi/
 │   ├── __init__.py
 │   ├── db.py
 │   └── grievance_system.db        # auto-created on first run
-├── models/
-│   ├── __init__.py
-│   ├── ml_model.py
-│   ├── complaint_classifier.pkl   # auto-created on first run
-│   └── tfidf_vectorizer.pkl       # auto-created on first run
 ├── static/
 │   └── style.css
 └── templates/
@@ -37,29 +32,24 @@ bgi/
    - `complaints`
    - `departments`
    - `assignments`
-3. ML complaint classifier:
-   - `preprocess_text(text)`
-   - `train_model()`
-   - `classify_complaint(text)`
-   - TF-IDF + Logistic Regression + pickle artifacts
-4. Complaint form UI (Name, Location, Complaint Text).
-5. Flask submit route:
-   - Classify complaint
+3. Complaint form UI (Name, Location, Complaint Text, optional photos).
+4. Flask submit route:
+   - Categorize complaint using rule-based keyword matching
    - Save in DB
    - Return `Complaint registered under [CATEGORY]`
-6. Department routing and assignment:
+5. Department routing and assignment:
    - Water -> Water Department
    - Electricity -> Electricity Department
    - Roads -> Municipal Department
    - Garbage -> Sanitation Department
    - Healthcare -> Health Department
-7. Admin dashboard:
+   - Fire -> Fire Department
+6. Admin dashboard:
    - View all complaints
    - Filter by category
    - Update status: Pending -> In Progress -> Resolved
-8. Complaint tracking by unique ID (`CMP-YYYYMMDD-XXXXXX`).
-9. Optional voice input in complaint form (browser speech recognition).
-10. Analytics dashboard (Chart.js):
+7. Complaint tracking by unique ID (`CMP-YYYYMMDD-XXXXXX`).
+8. Analytics dashboard:
    - Complaints per category
    - Status distribution
    - Most common issue
