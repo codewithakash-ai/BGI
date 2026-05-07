@@ -18,13 +18,12 @@ Three visitor types:
 import os
 import random
 import re
-import smtplib
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
 from typing import Dict, Optional, Tuple
 from uuid import uuid4
 
 import joblib
+import requests
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -96,13 +95,8 @@ def load_env_file(path: str) -> None:
 
 load_env_file(os.path.join(BASE_DIR, ".env"))
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM = os.getenv("SMTP_FROM")
-SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
-SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "your_verified_email@gmail.com")
 
 # Fake department accounts: username → password + internal department key
 DEPARTMENT_USERS = {
@@ -320,42 +314,30 @@ def dashboard_summary_counts(complaints) -> Dict[str, int]:
     }
 
 
-def send_otp_email(recipient: str, otp_code: str) -> bool:
-    """Send OTP email using SMTP settings from environment variables."""
-    server = None
+def send_otp(email: str, otp: str) -> bool:
+    """Send OTP via Brevo transactional email API."""
     try:
-        if SMTP_USERNAME is None or not str(SMTP_USERNAME).strip():
-            raise RuntimeError("SMTP not loaded")
-        if SMTP_PASSWORD is None or not str(SMTP_PASSWORD).strip():
-            raise RuntimeError("SMTP password not loaded")
-        sender = SMTP_FROM or SMTP_USERNAME
-        if sender is None or not str(sender).strip():
-            raise RuntimeError("SMTP sender not loaded")
+        if BREVO_API_KEY is None or not str(BREVO_API_KEY).strip():
+            raise RuntimeError("BREVO_API_KEY is missing")
 
-        message = MIMEText("Your OTP is: {code}".format(code=otp_code))
-        message["Subject"] = "OTP Verification"
-        message["From"] = sender
-        message["To"] = recipient
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        }
+        data = {
+            "sender": {"email": BREVO_SENDER_EMAIL},
+            "to": [{"email": email}],
+            "subject": "OTP Verification",
+            "htmlContent": f"<h3>Your OTP is {otp}</h3>",
+        }
 
-        if SMTP_USE_SSL:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
-        else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
-            server.ehlo()
-            if SMTP_USE_TLS:
-                server.starttls()
-                server.ehlo()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(message)
-        server.quit()
-        return True
-    except Exception as exc:
-        print("SMTP ERROR:", exc)
-        if server is not None:
-            try:
-                server.quit()
-            except Exception:
-                pass
+        response = requests.post(url, json=data, headers=headers, timeout=15)
+        print("BREVO RESPONSE:", response.text)
+        return response.status_code == 201
+    except Exception as e:
+        print("BREVO ERROR:", e)
         return False
 
 
@@ -575,7 +557,7 @@ def register():
                     otp_code = str(random.randint(100000, 999999))
                     otp_expiry = (datetime.now() + timedelta(minutes=5)).isoformat()
                     update_user_otp(int(existing_user["id"]), otp_code, otp_expiry)
-                    if send_otp_email(existing_email, otp_code):
+                    if send_otp(existing_email, otp_code):
                         flash("Account exists but is not verified. OTP resent.", "success")
                     else:
                         flash(
@@ -593,7 +575,7 @@ def register():
             return redirect(url_for("register"))
 
         session["pending_user_id"] = int(user_id)
-        if send_otp_email(email, otp_code):
+        if send_otp(email, otp_code):
             flash("OTP sent to your email.", "success")
         else:
             flash("Failed to send OTP. Please check email configuration.", "danger")
@@ -754,7 +736,7 @@ def resend_otp():
     otp_expiry = (datetime.now() + timedelta(minutes=5)).isoformat()
     update_user_otp(int(user["id"]), otp_code, otp_expiry)
 
-    if send_otp_email(str(user["email"]), otp_code):
+    if send_otp(str(user["email"]), otp_code):
         flash("OTP resent to your email.", "success")
     else:
         flash("Failed to send OTP. Please check email configuration.", "danger")
