@@ -467,7 +467,8 @@ def inject_lang_context():
 # =============================================================================
 # ROUTES — URL map (method → view function)
 # =============================================================================
-#   GET  /                  → index              citizen complaint form
+#   GET  /                  → home               user login/signup entry
+#   GET  /complaint         → index              citizen complaint form
 #   POST /submit            → submit_complaint   save complaint + ML category
 #   GET  /track             → track_complaint    lookup form
 #   POST /track             → track_complaint    lookup by UID
@@ -483,6 +484,11 @@ def inject_lang_context():
 
 
 @app.route("/", methods=["GET"])
+def home():
+    return redirect(url_for("user_login"))
+
+
+@app.route("/complaint", methods=["GET"])
 def index():
     if not is_user_logged_in():
         return redirect(url_for("user_login"))
