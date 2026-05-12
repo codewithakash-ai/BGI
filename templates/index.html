@@ -24,14 +24,33 @@
             />
         </label>
 
-        <label class="field-group">
+        <label class="field-group location-group">
             <span>{{ get_text('location') }}</span>
             <input id="location" name="location" type="text" placeholder="Area / Ward / City" required />
+            <div class="location-actions">
+                <button type="button" class="btn btn-ghost location-btn" id="useLocationBtn">
+                    <span class="location-icon">📍</span>
+                    <span class="location-label">Use Live Location</span>
+                    <span class="location-spinner" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="btn btn-ghost location-retry" id="retryLocationBtn" hidden>Retry</button>
+                <span class="location-status" id="locationStatus" aria-live="polite"></span>
+            </div>
+            <input type="hidden" id="latitude" name="latitude" />
+            <input type="hidden" id="longitude" name="longitude" />
         </label>
 
         <div class="field-group field-full complaint-upload">
             <div class="complaint-input">
                 <span>{{ get_text('complaint_text') }}</span>
+                <div class="voice-tools">
+                    <label for="langSelect">Language</label>
+                    <select id="langSelect" name="langSelect">
+                        <option value="hi-IN">Hindi</option>
+                        <option value="en-US">English</option>
+                    </select>
+                    <button type="button" class="btn btn-ghost" onclick="startVoice()">🎤 Speak</button>
+                </div>
                 <textarea
                     id="complaint_text"
                     name="complaint_text"
@@ -43,11 +62,11 @@
             <div class="upload-card">
                 <span><strong>Upload Proof (Optional)</strong></span>
                 <div class="upload-control">
-                    <input id="photos" class="file-input" type="file" name="photos" accept="image/*" multiple>
-                    <label class="file-trigger" for="photos">Choose images</label>
-                    <span class="file-count" id="photoCount">0 images selected</span>
+                    <input id="media" class="file-input" type="file" name="media" accept="image/*,video/*" multiple>
+                    <label class="file-trigger" for="media">Choose files</label>
+                    <span class="file-count" id="mediaCount">0 files selected</span>
                 </div>
-                <small class="upload-hint">Upload up to 2 images (JPG, PNG)</small>
+                <small class="upload-hint">You can upload up to 2 files (images or videos). Video max length: 1 minute.</small>
             </div>
         </div>
 
@@ -60,48 +79,246 @@
 
 {% block scripts %}
 <script>
+    function startVoice() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Speech recognition is not supported in this browser.");
+            return;
+        }
+
+        const complaintBox = document.getElementById("complaint_text");
+        if (!complaintBox) {
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        const langSelect = document.getElementById("langSelect");
+        const lang = langSelect ? langSelect.value : "hi-IN";
+
+        recognition.lang = lang;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = function (event) {
+            const text = event.results[0][0].transcript;
+            complaintBox.value = text;
+        };
+
+        recognition.onerror = function (event) {
+            alert("Voice error: " + event.error);
+        };
+
+        recognition.start();
+    }
+
+    window.startVoice = startVoice;
+
     (function () {
         const form = document.querySelector("form");
         if (!form) {
             return;
         }
-        const input = form.querySelector("input[name='photos']");
-        const countLabel = document.getElementById("photoCount");
-        const dataTransfer = new DataTransfer();
+        const input = form.querySelector("input[name='media']") || form.querySelector("input[name='photos']");
+        const countLabel = document.getElementById("mediaCount");
+        const maxFiles = 2;
+        const maxFilesMessage = "Maximum 2 files allowed";
 
-        if (input && countLabel) {
+        function updateCount() {
+            if (!input || !countLabel) {
+                return;
+            }
+            const count = (input.files || []).length;
+            countLabel.textContent = `${count} file${count === 1 ? "" : "s"} selected`;
+        }
+
+        if (input) {
             input.addEventListener("change", () => {
                 const selected = Array.from(input.files || []);
-                if (!selected.length) {
-                    return;
-                }
-
-                selected.forEach((file) => {
-                    if (dataTransfer.files.length < 2) {
+                if (selected.length > maxFiles) {
+                    alert(maxFilesMessage);
+                    const dataTransfer = new DataTransfer();
+                    selected.slice(0, maxFiles).forEach((file) => {
                         dataTransfer.items.add(file);
-                    }
-                });
-
-                if (dataTransfer.files.length > 2) {
-                    alert("You can upload maximum 2 images only");
-                    dataTransfer.items.clear();
+                    });
+                    input.files = dataTransfer.files;
                 }
-
-                input.files = dataTransfer.files;
-                const count = dataTransfer.files.length;
-                countLabel.textContent = `${count} image${count === 1 ? "" : "s"} selected`;
+                updateCount();
             });
         }
+
+        updateCount();
 
         form.addEventListener("submit", (event) => {
             if (!input) {
                 return;
             }
             const files = input.files || [];
-            if (files.length > 2) {
-                alert("You can upload maximum 2 images only");
+            if (files.length > maxFiles) {
+                alert(maxFilesMessage);
                 event.preventDefault();
             }
+        });
+    })();
+
+    (function () {
+        const locationInput = document.getElementById("location");
+        const button = document.getElementById("useLocationBtn");
+        const retryButton = document.getElementById("retryLocationBtn");
+        const status = document.getElementById("locationStatus");
+        const latField = document.getElementById("latitude");
+        const lonField = document.getElementById("longitude");
+
+        if (!locationInput || !button || !status || !latField || !lonField) {
+            return;
+        }
+
+        function setStatus(message, tone) {
+            status.textContent = message || "";
+            status.dataset.tone = tone || "";
+        }
+
+        function setRetry(visible) {
+            if (!retryButton) {
+                return;
+            }
+            retryButton.hidden = !visible;
+        }
+
+        function setLoading(isLoading) {
+            button.disabled = isLoading;
+            button.classList.toggle("loading", isLoading);
+        }
+
+        if (!navigator.geolocation) {
+            setStatus("Location is not supported in this browser.", "error");
+            button.disabled = true;
+            return;
+        }
+
+        const secureHostnames = new Set(["localhost", "127.0.0.1"]);
+        const isSecureContext =
+            window.isSecureContext ||
+            location.protocol === "https:" ||
+            secureHostnames.has(location.hostname);
+
+        async function reverseGeocode(lat, lon) {
+            try {
+                const response = await fetch("/geocode/reverse", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ latitude: lat, longitude: lon }),
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data?.error || "Location lookup failed");
+                }
+                return data;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        async function fetchApproxLocation() {
+            setStatus("Trying approximate location...", "loading");
+            setLoading(true);
+            setRetry(false);
+
+            try {
+                const response = await fetch("/geocode/ip");
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data?.error || "Approximate location failed");
+                }
+                locationInput.value = data.location || "";
+                latField.value = data.latitude ?? "";
+                lonField.value = data.longitude ?? "";
+                setStatus("Location captured (approximate).", "success");
+            } catch (error) {
+                setStatus("Unable to detect location. Please enter manually.", "error");
+                setRetry(true);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function handleGeoError(err) {
+            if (!err) {
+                setStatus("Unable to fetch location.", "error");
+                setRetry(true);
+                return;
+            }
+            switch (err.code) {
+                case err.PERMISSION_DENIED:
+                    setStatus("Location permission denied. Trying approximate location...", "loading");
+                    break;
+                case err.POSITION_UNAVAILABLE:
+                    setStatus("Location unavailable. Trying approximate location...", "loading");
+                    break;
+                case err.TIMEOUT:
+                    setStatus("Location request timed out. Trying approximate location...", "loading");
+                    break;
+                default:
+                    setStatus("Unable to fetch location. Trying approximate location...", "loading");
+                    break;
+            }
+            fetchApproxLocation();
+        }
+
+        function applyLocation(data, sourceLabel) {
+            locationInput.value = data.location || "";
+            latField.value = data.latitude ?? "";
+            lonField.value = data.longitude ?? "";
+            setStatus(
+                sourceLabel ? `Location captured (${sourceLabel}).` : "Location captured successfully.",
+                "success"
+            );
+            setRetry(false);
+        }
+
+        button.addEventListener("click", () => {
+            setStatus("Fetching live location...", "loading");
+            setLoading(true);
+            setRetry(false);
+
+            if (!isSecureContext) {
+                setStatus("Live location needs HTTPS. Trying approximate location...", "loading");
+                fetchApproxLocation();
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    latField.value = lat.toFixed(6);
+                    lonField.value = lon.toFixed(6);
+                    reverseGeocode(lat, lon)
+                        .then((data) => {
+                            applyLocation(data, "GPS");
+                        })
+                        .catch(() => {
+                            setStatus("Coordinates captured. Enter area manually.", "error");
+                            setRetry(true);
+                        })
+                        .finally(() => {
+                            setLoading(false);
+                        });
+                },
+                (error) => {
+                    setLoading(false);
+                    handleGeoError(error);
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 30000,
+                    maximumAge: 60000,
+                }
+            );
+        });
+
+        retryButton?.addEventListener("click", () => {
+            button.click();
         });
     })();
 </script>

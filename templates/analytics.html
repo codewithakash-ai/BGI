@@ -59,6 +59,38 @@
         <canvas id="trendChart"></canvas>
     </div>
 </section>
+
+<section class="analytics-grid-three">
+    <article class="chart-panel">
+        <div class="chart-head">
+            <h3>Most Problematic Areas</h3>
+            <p>Open complaints by location</p>
+        </div>
+        <div class="chart-box medium">
+            <canvas id="areaChart"></canvas>
+        </div>
+    </article>
+
+    <article class="chart-panel">
+        <div class="chart-head">
+            <h3>Most Repeated Categories</h3>
+            <p>Repeat volume across services</p>
+        </div>
+        <div class="chart-box medium">
+            <canvas id="repeatCategoryChart"></canvas>
+        </div>
+    </article>
+
+    <article class="chart-panel">
+        <div class="chart-head">
+            <h3>Escalated Zones</h3>
+            <p>Areas with auto-escalated complaints</p>
+        </div>
+        <div class="chart-box medium">
+            <canvas id="escalatedAreaChart"></canvas>
+        </div>
+    </article>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -73,6 +105,12 @@
         const trendReceived = {{ analytics['weekly_received'] | tojson }};
         const trendResolved = {{ analytics['weekly_resolved'] | tojson }};
         const totalComplaints = {{ analytics['total_complaints'] | tojson }};
+        const topAreaLabels = {{ analytics['top_area_labels'] | tojson }};
+        const topAreaCounts = {{ analytics['top_area_counts'] | tojson }};
+        const repeatedCategoryLabels = {{ analytics['repeated_category_labels'] | tojson }};
+        const repeatedCategoryCounts = {{ analytics['repeated_category_counts'] | tojson }};
+        const escalatedAreaLabels = {{ analytics['escalated_area_labels'] | tojson }};
+        const escalatedAreaCounts = {{ analytics['escalated_area_counts'] | tojson }};
 
         const chartPalette = [
             "#1e3a8a",
@@ -244,6 +282,117 @@
                         beginAtZero: true,
                         ticks: { precision: 0, color: "#64748b", font: { family: "Inter", size: 11 } },
                         grid: { color: "rgba(148, 163, 184, 0.14)" },
+                    },
+                },
+            },
+        });
+
+        new Chart(document.getElementById("areaChart"), {
+            type: "bar",
+            data: {
+                labels: topAreaLabels,
+                datasets: [{
+                    label: "Open Complaints",
+                    data: topAreaCounts,
+                    backgroundColor: "rgba(79, 70, 229, 0.45)",
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#0f172a",
+                        titleFont: { family: "Inter", size: 12, weight: "600" },
+                        bodyFont: { family: "Inter", size: 12 },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#334155", font: { family: "Inter", size: 10, weight: "600" } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, color: "#64748b", font: { family: "Inter", size: 11 } },
+                        grid: { color: "rgba(148, 163, 184, 0.18)" },
+                    },
+                },
+            },
+        });
+
+        new Chart(document.getElementById("repeatCategoryChart"), {
+            type: "bar",
+            data: {
+                labels: repeatedCategoryLabels,
+                datasets: [{
+                    label: "Repeat Volume",
+                    data: repeatedCategoryCounts,
+                    backgroundColor: "rgba(14, 165, 233, 0.45)",
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#0f172a",
+                        titleFont: { family: "Inter", size: 12, weight: "600" },
+                        bodyFont: { family: "Inter", size: 12 },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#334155", font: { family: "Inter", size: 10, weight: "600" } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, color: "#64748b", font: { family: "Inter", size: 11 } },
+                        grid: { color: "rgba(148, 163, 184, 0.18)" },
+                    },
+                },
+            },
+        });
+
+        new Chart(document.getElementById("escalatedAreaChart"), {
+            type: "bar",
+            data: {
+                labels: escalatedAreaLabels,
+                datasets: [{
+                    label: "Escalated",
+                    data: escalatedAreaCounts,
+                    backgroundColor: "rgba(239, 68, 68, 0.45)",
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#0f172a",
+                        titleFont: { family: "Inter", size: 12, weight: "600" },
+                        bodyFont: { family: "Inter", size: 12 },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#334155", font: { family: "Inter", size: 10, weight: "600" } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, color: "#64748b", font: { family: "Inter", size: 11 } },
+                        grid: { color: "rgba(148, 163, 184, 0.18)" },
                     },
                 },
             },

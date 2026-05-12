@@ -70,6 +70,13 @@
     </div>
 </section>
 
+{% if escalation_alerts %}
+    <section class="escalation-alert" role="status">
+        <strong>Multiple complaints detected from this area.</strong>
+        <span>{{ escalation_alerts | join(', ') }}</span>
+    </section>
+{% endif %}
+
 {% if complaints %}
     <section class="complaints-grid" id="complaintsGrid" aria-live="polite">
         {% for complaint in complaints %}
@@ -78,7 +85,7 @@
             {% set category_icon = '🛣️' if complaint['category'] == 'Roads' else ('💧' if complaint['category'] == 'Water' else ('⚡' if complaint['category'] == 'Electricity' else ('🏥' if complaint['category'] == 'Healthcare' else ('🗑️' if complaint['category'] == 'Garbage' else '📌')))) %}
 
             <article
-                class="complaint-card"
+                class="complaint-card {% if complaint['is_escalated'] %}is-escalated{% endif %}"
                 data-status="{{ complaint['status']|lower }}"
                 data-priority="{{ complaint['priority']|lower }}"
                 data-created="{{ complaint['created_at'] }}"
@@ -91,6 +98,9 @@
                     <span class="id-pill">{{ complaint['complaint_uid'] }}</span>
                     <div class="badge-row">
                         <span class="badge priority {{ priority_class }}">{{ complaint['priority'] }}</span>
+                        {% if complaint['is_escalated'] %}
+                            <span class="badge escalation">Area Escalation</span>
+                        {% endif %}
                         <span class="badge status {{ status_class }}">{{ complaint['status'] }}</span>
                     </div>
                 </header>
@@ -106,12 +116,21 @@
                 <p class="complaint-copy" data-collapsible>{{ complaint['text'] }}</p>
                 <button type="button" class="read-more" data-toggle-text>Read more</button>
 
-                {% if complaint['photo'] %}
-                    {% set photos = complaint['photo'].split(',') %}
+                {% set media_csv = complaint['media_paths'] or complaint['photo'] %}
+                {% if media_csv %}
+                    {% set media_files = media_csv.split(',') %}
                     <div class="complaint-proof">
-                        {% for photo in photos %}
-                            {% if photo %}
-                                <img src="{{ url_for('static', filename='uploads/' + photo) }}" width="120" alt="Complaint proof">
+                        {% for media_file in media_files %}
+                            {% if media_file %}
+                                {% set media_name = media_file|lower %}
+                                {% if media_name.endswith('.mp4') or media_name.endswith('.mov') or media_name.endswith('.avi') %}
+                                    <video width="180" controls preload="metadata">
+                                        <source src="{{ url_for('static', filename='uploads/' + media_file) }}">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                {% else %}
+                                    <img src="{{ url_for('static', filename='uploads/' + media_file) }}" width="120" alt="Complaint proof">
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
                     </div>

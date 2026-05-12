@@ -1,16 +1,74 @@
-    {% extends "base.html" %}
+{% extends "base.html" %}
+
+{% macro render_proof_gallery(record) %}
+    <section class="proof-gallery-shell">
+        <div class="proof-gallery-head">
+            <h4>Proof Files</h4>
+            <span class="proof-count-chip">{{ record['proof_count'] }} file{% if record['proof_count'] != 1 %}s{% endif %}</span>
+        </div>
+
+        {% if record['proof_files'] %}
+            <div class="proof-grid {% if record['proof_count'] > 1 %}proof-grid-multi{% endif %}">
+                {% for proof in record['proof_files'] %}
+                    <article class="proof-item-card">
+                        {% if proof['type'] == 'image' %}
+                            <button
+                                type="button"
+                                class="proof-image-trigger"
+                                data-proof-image="{{ proof['url'] }}"
+                                data-proof-name="{{ proof['filename'] }}"
+                                aria-label="Open image proof {{ loop.index }}"
+                            >
+                                <img
+                                    src="{{ proof['url'] }}"
+                                    alt="Complaint proof image {{ loop.index }} for {{ record['complaint_uid'] }}"
+                                    loading="lazy"
+                                />
+                            </button>
+                        {% else %}
+                            <div class="proof-video-wrap">
+                                <video controls preload="metadata" playsinline>
+                                    <source src="{{ proof['url'] }}" type="{{ proof['mime'] }}" />
+                                    Your browser does not support this video format.
+                                </video>
+                            </div>
+                        {% endif %}
+
+                        <div class="proof-item-foot">
+                            <span class="proof-filename" title="{{ proof['filename'] }}">{{ proof['filename'] }}</span>
+                            <div class="proof-actions">
+                                <a href="{{ proof['url'] }}" target="_blank" rel="noopener" class="btn btn-ghost btn-mini">View Full Proof</a>
+                                <a href="{{ proof['url'] }}" download class="btn btn-ghost btn-mini">Download</a>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <article class="proof-empty-card">
+                <div class="proof-empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="m8 14 2.2-2.2a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 0 1.4 0L16 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/></svg>
+                </div>
+                <div class="proof-empty-copy">
+                    <h5>No Proof Uploaded</h5>
+                    <p>No supporting image or video was attached with this complaint.</p>
+                </div>
+            </article>
+        {% endif %}
+    </section>
+{% endmacro %}
 
 {% block page_title %}{{ get_text('track') }}{% endblock %}
 {% block breadcrumb %}Smart AI Grievance / Citizen Service / {{ get_text('track') }}{% endblock %}
 
 {% block content %}
-<section class="track-layout">
+<section class="track-layout track-layout-wide">
     <article class="track-search-card">
         <div class="track-icon-wrap" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16.4 16.4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </div>
         <h2>{{ get_text('track_your_complaint') }}</h2>
-        <p>Enter your unique ID to see real-time status.</p>
+        <p>Enter your complaint ID for direct status lookup.</p>
 
         <form method="POST" action="{{ url_for('track_complaint') }}" class="track-form">
             <input
@@ -18,7 +76,7 @@
                 name="complaint_uid"
                 type="text"
                 value="{{ searched_id }}"
-                placeholder="e.g. GRV-2024-001"
+                placeholder="e.g. CMP-20260511-A1B2C3"
                 autocomplete="off"
                 required
             />
@@ -27,11 +85,8 @@
     </article>
 
     {% if complaint %}
-        {% set timeline_index = ['Pending', 'In Progress', 'Resolved'].index(complaint['status']) if complaint['status'] in ['Pending', 'In Progress', 'Resolved'] else 0 %}
         {% set status_class = complaint['status']|lower|replace(' ', '-') %}
-        {% set priority_class = complaint['priority']|lower %}
-        {% set category_icon = '🛣️' if complaint['category'] == 'Roads' else ('💧' if complaint['category'] == 'Water' else ('⚡' if complaint['category'] == 'Electricity' else ('🏥' if complaint['category'] == 'Healthcare' else ('🗑️' if complaint['category'] == 'Garbage' else '📌')))) %}
-
+        {% set priority_class = complaint['priority']|default('Low')|lower %}
         <article class="track-result-card reveal-in" id="trackResult">
             <header class="result-head">
                 <div>
@@ -39,8 +94,11 @@
                     <span class="result-date">{{ get_text('submitted_on') }} {{ complaint['created_at'] }}</span>
                 </div>
                 <div class="badge-row">
-                    <span class="badge priority {{ priority_class }}">{{ complaint['priority'] }}</span>
-                    <span class="badge status {{ status_class }}">{{ complaint['status'] }}</span>
+                    <span class="priority-pill priority-{{ priority_class }}">{{ complaint['priority'] or 'Low' }}</span>
+                    {% if complaint['is_escalated'] %}
+                        <span class="badge escalation">Marked High Priority (Area Escalation)</span>
+                    {% endif %}
+                    <span class="status-pill status-{{ status_class }}">{{ complaint['status'] }}</span>
                 </div>
             </header>
 
@@ -49,15 +107,17 @@
             <div class="result-meta-grid">
                 <div class="meta-panel">
                     <span>{{ get_text('category') }}</span>
-                    <strong>{{ category_icon }} {{ complaint['category'] }}</strong>
-                </div>
-                <div class="meta-panel">
-                    <span>{{ get_text('priority') }}</span>
-                    <strong>{{ complaint['priority'] }}</strong>
+                    <strong>{{ complaint['category'] }}</strong>
                 </div>
                 <div class="meta-panel">
                     <span>{{ get_text('location') }}</span>
                     <strong>{{ complaint['location'] }}</strong>
+                </div>
+                <div class="meta-panel">
+                    <span>Proof</span>
+                    <strong class="proof-inline {{ 'has-proof' if complaint['has_proof'] else 'no-proof' }}">
+                        {{ 'Uploaded' if complaint['has_proof'] else 'Not Uploaded' }}
+                    </strong>
                 </div>
                 <div class="meta-panel">
                     <span>{{ get_text('department') }}</span>
@@ -65,33 +125,260 @@
                 </div>
             </div>
 
-            <div class="status-timeline">
-                <div class="timeline-step {% if timeline_index > 0 %}done{% elif timeline_index == 0 %}active{% endif %}">
-                    <span class="dot"></span>
-                    <span>{{ get_text('submitted') }}</span>
+            {{ render_proof_gallery(complaint) }}
+
+            <div class="complaint-progress {% if complaint['status'] == 'Rejected' %}is-rejected{% endif %}">
+                <div class="progress-track">
+                    <span style="width: {{ complaint['progress_percent'] }}%;"></span>
                 </div>
-                <div class="connector {% if timeline_index > 0 %}done{% endif %}"></div>
-                <div class="timeline-step {% if timeline_index > 1 %}done{% elif timeline_index == 1 %}active{% endif %}">
-                    <span class="dot"></span>
-                    <span>{{ get_text('in_progress') }}</span>
-                </div>
-                <div class="connector {% if timeline_index > 1 %}done{% endif %}"></div>
-                <div class="timeline-step {% if timeline_index == 2 %}active{% endif %}">
-                    <span class="dot"></span>
-                    <span>{{ get_text('resolved') }}</span>
-                </div>
+                <p>{{ complaint['progress_label'] }}</p>
             </div>
         </article>
     {% endif %}
+
+    <article class="my-complaints-shell">
+        <header class="my-complaints-head">
+            <div>
+                <h3>My Complaints</h3>
+                <p>Review your submitted grievances, filters, and status progress in one place.</p>
+            </div>
+            <span class="my-count-badge">{{ complaints_total }}</span>
+        </header>
+
+        <form method="GET" action="{{ url_for('track_complaint') }}" class="my-complaints-filters">
+            <label>
+                <span>Search Complaint ID</span>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ track_filters['q'] }}"
+                    placeholder="CMP-20260511"
+                    autocomplete="off"
+                />
+            </label>
+            <label>
+                <span>Status</span>
+                <select name="status">
+                    <option value="">All Status</option>
+                    {% for status in track_status_options %}
+                        <option value="{{ status }}" {% if track_filters['status'] == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Category / Department</span>
+                <select name="category">
+                    <option value="">All Categories</option>
+                    {% for category in track_category_options %}
+                        <option value="{{ category }}" {% if track_filters['category'] == category %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Assigned Department</span>
+                <select name="department">
+                    <option value="">All Departments</option>
+                    {% for department in track_department_options %}
+                        <option value="{{ department }}" {% if track_filters['department'] == department %}selected{% endif %}>{{ department }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="filter-actions-row">
+                <button type="submit" class="btn">Apply</button>
+                <a href="{{ url_for('track_complaint') }}" class="btn btn-ghost">Reset</a>
+            </div>
+        </form>
+
+        {% if complaints_total == 0 %}
+            <div class="empty-state">
+                <h3>No Complaints Yet</h3>
+                <p>You have not submitted any complaints yet.</p>
+            </div>
+        {% elif not complaints %}
+            <div class="empty-state">
+                <h3>No Matching Complaints</h3>
+                <p>No complaints match the selected search and filter options.</p>
+            </div>
+        {% else %}
+            <div class="my-complaints-grid">
+                {% for item in complaints %}
+                    {% set status_class = item['status']|lower|replace(' ', '-') %}
+                    {% set priority_class = item['priority']|default('Low')|lower %}
+                    <article class="my-complaint-card reveal-in" data-complaint-id="{{ item['complaint_uid'] }}">
+                        <header class="my-card-head">
+                            <div>
+                                <p class="result-id">{{ item['complaint_uid'] }}</p>
+                                <span class="result-date">{{ get_text('submitted_on') }} {{ item['created_at'] }}</span>
+                            </div>
+                            <span class="status-pill status-{{ status_class }}">{{ item['status'] }}</span>
+                        </header>
+
+                        {% if item['is_escalated'] %}
+                            <span class="badge escalation">Marked High Priority (Area Escalation)</span>
+                        {% endif %}
+
+                        <p class="my-complaint-preview">
+                            {{ item['text'][:130] }}{% if item['text']|length > 130 %}...{% endif %}
+                        </p>
+
+                        <div class="my-meta-grid">
+                            <div>
+                                <span>{{ get_text('category') }}</span>
+                                <strong>{{ item['category'] }}</strong>
+                            </div>
+                            <div>
+                                <span>{{ get_text('location') }}</span>
+                                <strong>{{ item['location'] }}</strong>
+                            </div>
+                            <div>
+                                <span>{{ get_text('priority') }}</span>
+                                <strong class="priority-inline priority-{{ priority_class }}">{{ item['priority'] or 'Low' }}</strong>
+                            </div>
+                            <div>
+                                <span>Proof</span>
+                                <strong class="proof-inline {{ 'has-proof' if item['has_proof'] else 'no-proof' }}">
+                                    {{ 'Uploaded' if item['has_proof'] else 'Not Uploaded' }}
+                                </strong>
+                            </div>
+                            <div>
+                                <span>{{ get_text('department') }}</span>
+                                <strong>{{ item['department_name'] or 'Unassigned' }}</strong>
+                            </div>
+                        </div>
+
+                        {{ render_proof_gallery(item) }}
+
+                        <div class="complaint-progress {% if item['status'] == 'Rejected' %}is-rejected{% endif %}">
+                            <div class="progress-track">
+                                <span style="width: {{ item['progress_percent'] }}%;"></span>
+                            </div>
+                            <p>{{ item['progress_label'] }}</p>
+                        </div>
+
+                        <div class="my-action-row">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-mini"
+                                data-detail-target="detail-{{ loop.index }}"
+                            >
+                                View Details
+                            </button>
+                            <form method="POST" action="{{ url_for('track_complaint') }}" class="inline-track-form">
+                                <input type="hidden" name="complaint_uid" value="{{ item['complaint_uid'] }}" />
+                                <button type="submit" class="btn btn-mini">Track Status</button>
+                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-mini"
+                                data-toast="Receipt download will be available soon for {{ item['complaint_uid'] }}."
+                            >
+                                Download Receipt
+                            </button>
+                        </div>
+
+                        <div class="my-detail-box" id="detail-{{ loop.index }}" hidden>
+                            <p>{{ item['text'] }}</p>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </article>
+</section>
+
+<section class="proof-lightbox" id="proofLightbox" hidden>
+    <button type="button" class="proof-lightbox-close" id="proofLightboxClose" aria-label="Close proof preview">
+        <svg viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <figure class="proof-lightbox-figure">
+        <img id="proofLightboxImage" src="" alt="Complaint proof preview" />
+        <figcaption id="proofLightboxCaption"></figcaption>
+    </figure>
 </section>
 {% endblock %}
 
 {% block scripts %}
 <script>
     (function () {
-        const input = document.getElementById("complaint_uid");
-        input?.addEventListener("input", () => {
-            input.value = input.value.toUpperCase();
+        const manualInput = document.getElementById("complaint_uid");
+        manualInput?.addEventListener("input", () => {
+            manualInput.value = manualInput.value.toUpperCase();
+        });
+
+        const filterInput = document.querySelector('input[name="q"]');
+        filterInput?.addEventListener("input", () => {
+            filterInput.value = filterInput.value.toUpperCase();
+        });
+
+        document.querySelectorAll("[data-detail-target]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const targetId = button.getAttribute("data-detail-target");
+                if (!targetId) {
+                    return;
+                }
+                const detailBox = document.getElementById(targetId);
+                if (!detailBox) {
+                    return;
+                }
+                const isHidden = detailBox.hasAttribute("hidden");
+                if (isHidden) {
+                    detailBox.removeAttribute("hidden");
+                    button.textContent = "Hide Details";
+                } else {
+                    detailBox.setAttribute("hidden", "");
+                    button.textContent = "View Details";
+                }
+            });
+        });
+
+        const lightbox = document.getElementById("proofLightbox");
+        const lightboxImage = document.getElementById("proofLightboxImage");
+        const lightboxCaption = document.getElementById("proofLightboxCaption");
+        const lightboxClose = document.getElementById("proofLightboxClose");
+
+        function closeLightbox() {
+            if (!lightbox) {
+                return;
+            }
+            lightbox.setAttribute("hidden", "");
+            document.body.classList.remove("proof-modal-open");
+            if (lightboxImage) {
+                lightboxImage.src = "";
+            }
+            if (lightboxCaption) {
+                lightboxCaption.textContent = "";
+            }
+        }
+
+        document.querySelectorAll("[data-proof-image]").forEach((trigger) => {
+            trigger.addEventListener("click", () => {
+                if (!lightbox || !lightboxImage) {
+                    return;
+                }
+                const imageUrl = trigger.getAttribute("data-proof-image");
+                if (!imageUrl) {
+                    return;
+                }
+                lightboxImage.src = imageUrl;
+                if (lightboxCaption) {
+                    lightboxCaption.textContent = trigger.getAttribute("data-proof-name") || "Proof Image";
+                }
+                lightbox.removeAttribute("hidden");
+                document.body.classList.add("proof-modal-open");
+            });
+        });
+
+        lightboxClose?.addEventListener("click", closeLightbox);
+        lightbox?.addEventListener("click", (event) => {
+            if (event.target === lightbox) {
+                closeLightbox();
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                closeLightbox();
+            }
         });
     })();
 </script>

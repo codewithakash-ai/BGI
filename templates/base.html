@@ -175,6 +175,47 @@
         </a>
     </nav>
 
+    {% if is_citizen_user %}
+        <button type="button" class="chatbot-fab" id="chatbotFab" aria-controls="chatbotPanel" aria-expanded="false">
+            <span class="chatbot-fab-ring" aria-hidden="true"></span>
+            <span class="chatbot-fab-core">AI</span>
+        </button>
+
+        <section class="chatbot-panel" id="chatbotPanel" aria-hidden="true">
+            <header class="chatbot-header">
+                <div class="chatbot-avatar">AI</div>
+                <div class="chatbot-head-copy">
+                    <strong>Citizen Assistant</strong>
+                    <span>Ask for department contact details</span>
+                </div>
+                <button type="button" class="chatbot-close" id="chatbotClose" aria-label="Close assistant">x</button>
+            </header>
+
+            <div class="chatbot-messages" id="chatbotMessages" aria-live="polite"></div>
+
+            <div class="chatbot-suggestions">
+                <button type="button" class="chatbot-chip" data-suggestion="water complaint number MP Nagar">Water - MP Nagar</button>
+                <button type="button" class="chatbot-chip" data-suggestion="road complaint number Misrod">Road - Misrod</button>
+                <button type="button" class="chatbot-chip" data-suggestion="electricity complaint number Danish Nagar">Electricity - Danish Nagar</button>
+                <button type="button" class="chatbot-chip" data-suggestion="healthcare complaint number Kolar">Healthcare - Kolar</button>
+                <button type="button" class="chatbot-chip" data-suggestion="fire complaint number BHEL">Fire - BHEL</button>
+            </div>
+
+            <form class="chatbot-input" id="chatbotForm" autocomplete="off">
+                <input
+                    id="chatbotInput"
+                    name="message"
+                    type="text"
+                    placeholder="Ask for a department number..."
+                    maxlength="400"
+                    required
+                />
+                <button type="button" class="chatbot-mic" id="chatbotMic" aria-label="Voice input">Mic</button>
+                <button type="submit" class="chatbot-send" aria-label="Send message">Send</button>
+            </form>
+        </section>
+    {% endif %}
+
     <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
     <script>
@@ -281,5 +322,168 @@
         })();
     </script>
     {% block scripts %}{% endblock %}
+    {% if is_citizen_user %}
+    <script>
+        (function () {
+            const panel = document.getElementById("chatbotPanel");
+            const fab = document.getElementById("chatbotFab");
+            const closeBtn = document.getElementById("chatbotClose");
+            const form = document.getElementById("chatbotForm");
+            const input = document.getElementById("chatbotInput");
+            const messages = document.getElementById("chatbotMessages");
+            const micBtn = document.getElementById("chatbotMic");
+            const suggestionButtons = Array.from(document.querySelectorAll(".chatbot-chip"));
+
+            if (!panel || !fab || !form || !input || !messages) {
+                return;
+            }
+
+            function setOpen(isOpen) {
+                panel.classList.toggle("open", isOpen);
+                panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+                fab.setAttribute("aria-expanded", isOpen ? "true" : "false");
+                if (isOpen) {
+                    input.focus();
+                }
+            }
+
+            function scrollToBottom() {
+                messages.scrollTop = messages.scrollHeight;
+            }
+
+            function addMessage(text, role) {
+                const bubble = document.createElement("div");
+                bubble.className = `chatbot-bubble ${role}`;
+                bubble.textContent = text;
+                messages.appendChild(bubble);
+                scrollToBottom();
+                return bubble;
+            }
+
+            function addTyping() {
+                const bubble = document.createElement("div");
+                bubble.className = "chatbot-bubble bot typing";
+                bubble.innerHTML = "<span></span><span></span><span></span>";
+                messages.appendChild(bubble);
+                scrollToBottom();
+                return bubble;
+            }
+
+            function addContactCard(payload) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "chatbot-bubble bot";
+
+                const title = document.createElement("div");
+                title.className = "chatbot-contact-title";
+                title.textContent = `${payload.department} - ${payload.area}`;
+
+                const phone = document.createElement("div");
+                phone.className = "chatbot-contact-row";
+                phone.textContent = `Phone: ${payload.phone}`;
+
+                const emailRow = document.createElement("div");
+                emailRow.className = "chatbot-contact-row";
+                const emailLink = document.createElement("a");
+                emailLink.href = `mailto:${payload.email}`;
+                emailLink.textContent = payload.email;
+                emailLink.rel = "noopener";
+                emailRow.append("Email: ", emailLink);
+
+                const office = document.createElement("div");
+                office.className = "chatbot-contact-row";
+                office.textContent = `Office: ${payload.office}`;
+
+                wrapper.appendChild(title);
+                wrapper.appendChild(phone);
+                wrapper.appendChild(emailRow);
+                wrapper.appendChild(office);
+
+                if (payload.area_source === "history") {
+                    const hint = document.createElement("div");
+                    hint.className = "chatbot-contact-hint";
+                    hint.textContent = "Using your last complaint area.";
+                    wrapper.appendChild(hint);
+                }
+
+                messages.appendChild(wrapper);
+                scrollToBottom();
+            }
+
+            async function sendMessage(text) {
+                const trimmed = String(text || "").trim();
+                if (!trimmed) {
+                    return;
+                }
+
+                addMessage(trimmed, "user");
+                input.value = "";
+                const typing = addTyping();
+
+                try {
+                    const response = await fetch("/chatbot/message", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: trimmed }),
+                    });
+
+                    const data = await response.json();
+                    typing.remove();
+
+                    if (!response.ok) {
+                        addMessage(data?.error || "Something went wrong.", "bot");
+                        return;
+                    }
+
+                    const reply = data?.reply;
+                    if (reply?.type === "contact") {
+                        addContactCard(reply);
+                    } else {
+                        addMessage(reply?.text || "Please try again.", "bot");
+                    }
+                } catch (error) {
+                    typing.remove();
+                    addMessage("Network error. Please try again.", "bot");
+                }
+            }
+
+            fab.addEventListener("click", () => setOpen(true));
+            closeBtn?.addEventListener("click", () => setOpen(false));
+
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                sendMessage(input.value);
+            });
+
+            suggestionButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const suggestion = button.getAttribute("data-suggestion") || "";
+                    setOpen(true);
+                    sendMessage(suggestion);
+                });
+            });
+
+            if (micBtn && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+                micBtn.addEventListener("click", () => {
+                    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const recognition = new Recognition();
+                    recognition.lang = "en-IN";
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript || "";
+                        input.value = transcript;
+                        sendMessage(transcript);
+                    };
+                    recognition.start();
+                });
+            } else if (micBtn) {
+                micBtn.disabled = true;
+                micBtn.title = "Voice input is not supported in this browser.";
+            }
+
+            addMessage("Hi! Ask me for a department complaint number and area.", "bot");
+        })();
+    </script>
+    {% endif %}
 </body>
 </html>

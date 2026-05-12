@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Complaint Feedback" }}</title>
+    <style>
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: #f4f6fb;
+            font-family: "Inter", "Segoe UI", Arial, sans-serif;
+            color: #0f172a;
+        }
+        .page-wrap {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px 12px;
+        }
+        .card {
+            max-width: 560px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .card-head {
+            background: linear-gradient(135deg, #0b3a6e, #1f6fb2);
+            color: #ffffff;
+            padding: 20px 24px;
+        }
+        .card-body {
+            padding: 24px;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #0f172a;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .meta-grid {
+            display: grid;
+            gap: 12px;
+            margin: 16px 0 20px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+        .meta-label {
+            color: #64748b;
+        }
+        .alert {
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            font-size: 0.9rem;
+        }
+        .alert-success {
+            background: rgba(22, 163, 74, 0.12);
+            color: #166534;
+            border: 1px solid rgba(22, 163, 74, 0.4);
+        }
+        .alert-danger {
+            background: rgba(220, 38, 38, 0.12);
+            color: #991b1b;
+            border: 1px solid rgba(220, 38, 38, 0.4);
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        select,
+        textarea {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+        textarea {
+            min-height: 120px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 16px;
+            border-radius: 10px;
+            border: 1px solid #1f6fb2;
+            background: #1f6fb2;
+            color: #ffffff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-row {
+            margin-top: 16px;
+        }
+        .note {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <main class="page-wrap">
+        <div class="card">
+            <div class="card-head">
+                <div class="pill">Smart Grievance</div>
+                <h1 style="margin:12px 0 0; font-size: 1.4rem;">Complaint Feedback</h1>
+            </div>
+            <div class="card-body">
+                {% if not complaint %}
+                    <div class="alert alert-danger">Complaint not found. Please check the link.</div>
+                {% else %}
+                    {% if feedback_error %}
+                        <div class="alert alert-danger">{{ feedback_error }}</div>
+                    {% endif %}
+                    {% if feedback_saved or feedback %}
+                        <div class="alert alert-success">Thank you! Your feedback has been recorded.</div>
+                        {% if feedback %}
+                            <div class="meta-grid">
+                                <div class="meta-row">
+                                    <span class="meta-label">Rating</span>
+                                    <strong>{{ feedback["rating"] }}/5</strong>
+                                </div>
+                                {% if feedback["message"] %}
+                                    <div class="meta-row">
+                                        <span class="meta-label">Message</span>
+                                        <strong>{{ feedback["message"] }}</strong>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="meta-grid">
+                            <div class="meta-row">
+                                <span class="meta-label">Complaint ID</span>
+                                <strong>{{ complaint["complaint_uid"] }}</strong>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Department</span>
+                                <strong>{{ complaint["department_name"] or "Unassigned" }}</strong>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Category</span>
+                                <strong>{{ complaint["category"] }}</strong>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Location</span>
+                                <strong>{{ complaint["location"] }}</strong>
+                            </div>
+                            <div class="meta-row">
+                                <span class="meta-label">Status</span>
+                                <strong>{{ complaint["status"] }}</strong>
+                            </div>
+                        </div>
+
+                        <form method="POST">
+                            <div>
+                                <label for="rating">Rating</label>
+                                <select id="rating" name="rating" required>
+                                    <option value="">Select rating</option>
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Good</option>
+                                    <option value="3">3 - Average</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="1">1 - Very Poor</option>
+                                </select>
+                            </div>
+                            <div style="margin-top:12px;">
+                                <label for="message">Comments (optional)</label>
+                                <textarea id="message" name="message" maxlength="500" placeholder="Share your feedback"></textarea>
+                            </div>
+                            <div class="btn-row">
+                                <button type="submit" class="btn">Submit Feedback</button>
+                            </div>
+                        </form>
+                        <div class="note">Your feedback helps us improve public services.</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html>
